@@ -49,6 +49,8 @@ PFNGLBINDIMAGETEXTUREPROC glBindImageTexture;
 PFNGLMEMORYBARRIERPROC glMemoryBarrier;
 PFNGLGETINTEGERI_VPROC glGetIntegeri_v;
 PFNGLDISPATCHCOMPUTEPROC glDispatchCompute;
+PFNGLBINDBUFFERBASEPROC glBindBufferBase;
+PFNGLBUFFERSUBDATAPROC glBufferSubData;
 
 PFNGLUNIFORM1IPROC glUniform1i;
 PFNGLUNIFORM1FPROC glUniform1f;
@@ -94,6 +96,8 @@ static void opengl_load_extensions(void) {
   glMemoryBarrier = (PFNGLMEMORYBARRIERPROC)wglGetProcAddress("glMemoryBarrier");
   glGetIntegeri_v = (PFNGLGETINTEGERI_VPROC)wglGetProcAddress("glGetIntegeri_v");
   glDispatchCompute = (PFNGLDISPATCHCOMPUTEPROC)wglGetProcAddress("glDispatchCompute");
+  glBindBufferBase = (PFNGLBINDBUFFERBASEPROC)wglGetProcAddress("glBindBufferBase");
+  glBufferSubData = (PFNGLBUFFERSUBDATAPROC)wglGetProcAddress("glBufferSubData");
 	glUniform1i = (PFNGLUNIFORM1IPROC)wglGetProcAddress("glUniform1i");
 	glUniform1f = (PFNGLUNIFORM1FPROC)wglGetProcAddress("glUniform1f");
 	glUniform2fv = (PFNGLUNIFORM2FVPROC)wglGetProcAddress("glUniform2fv");
