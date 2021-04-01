@@ -12,6 +12,7 @@ void opengl_swap_buffers(window* window);
 
 #define GL_ARRAY_BUFFER                   0x8892
 #define GL_STATIC_DRAW                    0x88E4
+#define GL_DYNAMIC_DRAW                   0x88E8
 #define GL_FRAGMENT_SHADER                0x8B30
 #define GL_VERTEX_SHADER                  0x8B31
 #define GL_COMPUTE_SHADER                 0x91B9
@@ -28,6 +29,8 @@ void opengl_swap_buffers(window* window);
 #define GL_MAX_COMPUTE_WORK_GROUP_COUNT   0x91BE
 #define GL_MAX_COMPUTE_WORK_GROUP_SIZE    0x91BF
 #define GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS 0x90EB
+#define GL_SHADER_STORAGE_BUFFER          0x90D2
+#define GL_SHADER_STORAGE_BARRIER_BIT     0x00002000
 
 // NOTE: Extensions
 typedef BOOL (WINAPI * PFNWGLCHOOSEPIXELFORMATARBPROC) (HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, 
@@ -68,6 +71,8 @@ typedef void (APIENTRY * PFNGLBINDIMAGETEXTUREPROC) (GLuint unit, GLuint texture
 typedef void (APIENTRY * PFNGLMEMORYBARRIERPROC) (GLbitfield barriers);
 typedef void (APIENTRY * PFNGLGETINTEGERI_VPROC) (GLenum target, GLuint index, GLint *data);
 typedef void (APIENTRY * PFNGLDISPATCHCOMPUTEPROC) (GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z);
+typedef void (APIENTRY * PFNGLBINDBUFFERBASEPROC) (GLenum target, GLuint index, GLuint buffer);
+typedef void (APIENTRY * PFNGLBUFFERSUBDATAPROC) (GLenum target, i32* offset, memory_index size, const void *data);
 
 typedef void (APIENTRY * PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
 typedef void (APIENTRY * PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
@@ -109,6 +114,8 @@ extern PFNGLBINDIMAGETEXTUREPROC glBindImageTexture;
 extern PFNGLMEMORYBARRIERPROC glMemoryBarrier;
 extern PFNGLGETINTEGERI_VPROC glGetIntegeri_v;
 extern PFNGLDISPATCHCOMPUTEPROC glDispatchCompute;
+extern PFNGLBINDBUFFERBASEPROC glBindBufferBase;
+extern PFNGLBUFFERSUBDATAPROC glBufferSubData;
 
 extern PFNGLUNIFORM1IPROC glUniform1i;
 extern PFNGLUNIFORM1FPROC glUniform1f;
