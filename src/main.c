@@ -6,10 +6,12 @@
 #include "system/opengl.h"
 #include "renderer/shader.h"
 
+#include "math.h"
+
 #include "windows.h"
 #include "gl/gl.h"
 
-#define WINDOW_WIDTH (512)
+#define WINDOW_WIDTH (800)
 #define ASPECT_RATIO (16.0f/9.0f)
 
 #define NUM_AGENTS (300)
@@ -23,6 +25,8 @@ typedef struct agent {
   f32 x, y;
   f32 dir;
 } agent;
+
+void ClearAgentsBuffer(window* window, agent* agents, u32 buffer);
 
 i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 showCode) {
   logger_initialize();
@@ -73,11 +77,10 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "\n"
         "void main()\n"
         "{\n"
-        "   vec4 pixel = vec4(0.0, 1.0, 0.0, 1.0);\n"
         "   ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);\n"
         "   ivec2 imageDim = imageSize(trailMap);\n"
         "   int pixelIndex = pixelCoord.y * imageDim.y + pixelCoord.x;\n"
-        "   if (pixelIndex.x > agentCount) { return; }\n"
+        "   if (pixelIndex.x >= agentCount) { return; }\n"
         ""
         "   agent ag = agents[pixelCoord.x];\n"
         "   uint random = hash(uint(ag.pos.y * imageDim.y + ag.pos.x + hash(pixelIndex.x)));\n"
@@ -136,16 +139,9 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   u32 agentsBuffer = 0;
   glGenBuffers(1, &agentsBuffer);
   agent* agents = (agent*)ph_alloc(sizeof(agent) * NUM_AGENTS);
-  for (u32 i = 0; i < NUM_AGENTS; i++) {
-    agent* current = &agents[i];
-    u32 rand = Hash((memory_index)(void*)current * i);
-    current->x = (f32)WINDOW_WIDTH / 2.0f + (rand % 100);
-    current->y = (f32)WINDOW_HEIGHT / 2.0f - (rand % 100);
-    current->dir = rand % 360 * (3.14159265f / 180.0f);
-  }
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, agentsBuffer);
   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(agent) * NUM_AGENTS, 0, GL_DYNAMIC_DRAW);
-  glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(agent) * NUM_AGENTS, agents);
+  ClearAgentsBuffer(window, agents, agentsBuffer);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, agentsLoc, agentsBuffer);
   
   
@@ -164,6 +160,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     if (window->size_changed) {
       glViewport(0, 0, window->width, window->height);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, window->width, window->height, 0, GL_RGBA, GL_FLOAT, 0);
+      ClearAgentsBuffer(window, agents, agentsBuffer);
       window->size_changed = 0;
     }
     
@@ -188,10 +185,27 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     lastTime = currentTime;
   }
   
+  ph_free(agents);
   clock_stop(clock);
   window_destroy(window);
   logger_destroy();
   return 0;
+}
+
+void ClearAgentsBuffer(window* window, agent* agents, u32 buffer) {
+  const f32 radius = MINIMUM(window->width, window->height);
+  for (u32 i = 0; i < NUM_AGENTS; i++) {
+    agent* current = &agents[i];
+    const u32 rand = Hash((memory_index)(void*)current * i);
+    current->dir = (f32)(rand % 360) * (3.14159265f / 180.0f);
+    const f32 r = sqrtf((f32)rand / 4294967295.0) * radius;
+    current->x = (f32)window->width / 2.0f; // + cosf(current->dir) * r;
+    current->y = (f32)window->height / 2.0f; // + sinf(current->dir) * r;
+    current->dir += 3.14159265f;
+  }
+  
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+  glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(agent) * NUM_AGENTS, agents);
 }
 
 u32 CreateQuadVAO() {
