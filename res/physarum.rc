@@ -2,9 +2,3 @@
 
 // NOTE: Icons
 IDI_ICON    ICON "icon.ico"
-IDI_ICON_SM ICON "icon_sm.ico"
-
-// NOTE: Bitmaps
-
-// NOTE: Cursors
-
