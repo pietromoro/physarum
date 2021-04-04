@@ -29,7 +29,7 @@ window* window_create(const u8* title, u32 width, u32 height) {
   windowClass.hInstance = instance;
   windowClass.hCursor = LoadCursor(0, IDC_ARROW);
   windowClass.hIcon = LoadIcon(instance, MAKEINTRESOURCE(IDI_ICON));
-  windowClass.hIconSm = LoadIcon(instance, MAKEINTRESOURCE(IDI_ICON_SM));
+  windowClass.hIconSm = LoadIcon(instance, MAKEINTRESOURCE(IDI_ICON));
   windowClass.lpszClassName = title;
   
   RECT border_rectangle = {0, 0, 0, 0};
