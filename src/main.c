@@ -16,6 +16,7 @@
 
 #define NUM_AGENTS (300)
 #define MOVE_SPEED (0.2f)
+#define EVAPORATE_SPEED (0.5f)
 
 u32 CreateQuadVAO();
 u32 CreateQuadProgram();
@@ -109,6 +110,35 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   glUniform1i(glGetUniformLocation(computeProgram, "agentCount"), NUM_AGENTS);
   glUniform1f(glGetUniformLocation(computeProgram, "moveSpeed"), MOVE_SPEED);
   
+  shader_info updateMapShaderInfo[] = {
+    {GL_COMPUTE_SHADER, "#version 430\n"
+        "layout (local_size_x = 1, local_size_y = 1) in;\n"
+        "layout (rgba32f) uniform image2D trailMap;\n"
+        "\n"
+        "uniform float deltaTime;\n"
+        "uniform float evaporateSpeed;\n"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "   ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);\n"
+        "   ivec2 imageDim = imageSize(trailMap);\n"
+        "   if (pixelCoord.x < 0 || pixelCoord.x >= imageDim.x || pixelCoord.y < 0 || pixelCoord.y >= imageDim.y) { return; }\n"
+        ""
+        "   vec4 original  = imageLoad(trailMap, pixelCoord);\n"
+        "   vec4 newValue = max(vec4(0.0), original - evaporateSpeed * deltaTime);\n"
+        ""
+        "   imageStore(trailMap, pixelCoord, newValue);\n"
+        "}\0"
+    },
+    0
+  };
+  
+  u32 processingShader = shader_create(updateMapShaderInfo);
+  u32 processingMapLoc = glGetUniformLocation(processingShader, "trailMap");
+  u32 processingDeltaTimeLoc = glGetUniformLocation(processingShader, "deltaTime");
+  glUseProgram(processingShader);
+  glUniform1f(glGetUniformLocation(processingShader, "evaporateSpeed"), EVAPORATE_SPEED);
+  
   u32 texture = 0;
   { // create the texture
     glGenTextures(1, &texture);
@@ -172,6 +202,13 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     glDispatchCompute((u32)window->width, (u32)window->height, 1);
     
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+    
+    glUseProgram(processingShader);
+    glBindImageTexture(processingMapLoc, texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glUniform1f(processingDeltaTimeLoc, delta);
+    glDispatchCompute((u32)window->width, (u32)window->height, 1);
+    
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(quadProgram);

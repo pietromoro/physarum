@@ -25,6 +25,7 @@ void opengl_swap_buffers(window* window);
 #define GL_CLAMP_TO_EDGE                  0x812F
 #define GL_RGBA32F                        0x8814
 #define GL_WRITE_ONLY                     0x88B9
+#define GL_READ_WRITE                     0x88BA
 #define GL_SHADER_IMAGE_ACCESS_BARRIER_BIT 0x00000020
 #define GL_MAX_COMPUTE_WORK_GROUP_COUNT   0x91BE
 #define GL_MAX_COMPUTE_WORK_GROUP_SIZE    0x91BF
