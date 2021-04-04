@@ -17,6 +17,7 @@
 #define NUM_AGENTS (300)
 #define MOVE_SPEED (0.2f)
 #define EVAPORATE_SPEED (0.5f)
+#define DIFFUSE_SPEED (3.4f)
 
 u32 CreateQuadVAO();
 u32 CreateQuadProgram();
@@ -116,6 +117,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "layout (rgba32f) uniform image2D trailMap;\n"
         "\n"
         "uniform float deltaTime;\n"
+        "uniform float diffuseSpeed;\n"
         "uniform float evaporateSpeed;\n"
         "\n"
         "void main()\n"
@@ -125,7 +127,19 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   if (pixelCoord.x < 0 || pixelCoord.x >= imageDim.x || pixelCoord.y < 0 || pixelCoord.y >= imageDim.y) { return; }\n"
         ""
         "   vec4 original  = imageLoad(trailMap, pixelCoord);\n"
-        "   vec4 newValue = max(vec4(0.0), original - evaporateSpeed * deltaTime);\n"
+        ""
+        "   vec4 finalSum = vec4(0.0);\n"
+        "   for (int offX = -1; offX <= 1; offX++) {\n"
+        "      for (int offY = -1; offY <= 1; offY++) {\n"
+        "         ivec2 samplePoint = pixelCoord + ivec2(offX, offY);\n"
+        "         if (samplePoint.x >= 0 && samplePoint.x < imageDim.x && samplePoint.y >= 0 && samplePoint.y < imageDim.y) {\n"
+        "            finalSum += imageLoad(trailMap, samplePoint);\n"
+        "         }\n"
+        "      }\n"
+        "   }\n"
+        "   vec4 blurred = finalSum / 9.0;"
+        "   vec4 diffused = mix(original, blurred, diffuseSpeed * deltaTime);\n"
+        "   vec4 newValue = max(vec4(0.0), diffused - evaporateSpeed * deltaTime);\n"
         ""
         "   imageStore(trailMap, pixelCoord, newValue);\n"
         "}\0"
@@ -138,7 +152,9 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   u32 processingDeltaTimeLoc = glGetUniformLocation(processingShader, "deltaTime");
   glUseProgram(processingShader);
   glUniform1f(glGetUniformLocation(processingShader, "evaporateSpeed"), EVAPORATE_SPEED);
+  glUniform1f(glGetUniformLocation(processingShader, "diffuseSpeed"), DIFFUSE_SPEED);
   
+  u32 imageW = window->width, imageH = window->height;
   u32 texture = 0;
   { // create the texture
     glGenTextures(1, &texture);
@@ -199,14 +215,14 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     glUniform1f(deltaTimeLoc, delta);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, agentsBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, agentsLoc, agentsBuffer);
-    glDispatchCompute((u32)window->width, (u32)window->height, 1);
+    glDispatchCompute(imageW, imageH, 1);
     
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
     
     glUseProgram(processingShader);
     glBindImageTexture(processingMapLoc, texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     glUniform1f(processingDeltaTimeLoc, delta);
-    glDispatchCompute((u32)window->width, (u32)window->height, 1);
+    glDispatchCompute(imageW, imageH, 1);
     
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     
