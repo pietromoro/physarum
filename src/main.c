@@ -24,6 +24,7 @@ u32 Hash(u32 state);
 typedef struct agent {
   f32 x, y;
   f32 dir;
+  u32 pad; // NOTE: padding ?!
 } agent;
 
 void ClearAgentsBuffer(window* window, agent* agents, u32 buffer);

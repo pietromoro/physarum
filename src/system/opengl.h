@@ -76,6 +76,7 @@ typedef void (APIENTRY * PFNGLBUFFERSUBDATAPROC) (GLenum target, i32* offset, me
 
 typedef void (APIENTRY * PFNGLUNIFORM1IPROC) (GLint location, GLint v0);
 typedef void (APIENTRY * PFNGLUNIFORM1FPROC) (GLint location, GLfloat v0);
+typedef void (APIENTRY * PFNGLUNIFORM2FPROC) (GLint location, const GLfloat v0, const GLfloat v1);
 typedef void (APIENTRY * PFNGLUNIFORM2FVPROC) (GLint location, GLsizei count, const GLfloat *value);
 typedef void (APIENTRY * PFNGLUNIFORM3FVPROC) (GLint location, GLsizei count, const GLfloat *value);
 typedef void (APIENTRY * PFNGLUNIFORM4FVPROC) (GLint location, GLsizei count, const GLfloat *value);
@@ -119,6 +120,7 @@ extern PFNGLBUFFERSUBDATAPROC glBufferSubData;
 
 extern PFNGLUNIFORM1IPROC glUniform1i;
 extern PFNGLUNIFORM1FPROC glUniform1f;
+extern PFNGLUNIFORM2FPROC glUniform2f;
 extern PFNGLUNIFORM2FVPROC glUniform2fv;
 extern PFNGLUNIFORM3FVPROC glUniform3fv;
 extern PFNGLUNIFORM4FVPROC glUniform4fv;

@@ -54,6 +54,7 @@ PFNGLBUFFERSUBDATAPROC glBufferSubData;
 
 PFNGLUNIFORM1IPROC glUniform1i;
 PFNGLUNIFORM1FPROC glUniform1f;
+PFNGLUNIFORM2FPROC glUniform2f;
 PFNGLUNIFORM2FVPROC glUniform2fv;
 PFNGLUNIFORM3FVPROC glUniform3fv;
 PFNGLUNIFORM4FVPROC glUniform4fv;
@@ -100,7 +101,8 @@ static void opengl_load_extensions(void) {
   glBufferSubData = (PFNGLBUFFERSUBDATAPROC)wglGetProcAddress("glBufferSubData");
 	glUniform1i = (PFNGLUNIFORM1IPROC)wglGetProcAddress("glUniform1i");
 	glUniform1f = (PFNGLUNIFORM1FPROC)wglGetProcAddress("glUniform1f");
-	glUniform2fv = (PFNGLUNIFORM2FVPROC)wglGetProcAddress("glUniform2fv");
+  glUniform2f = (PFNGLUNIFORM2FPROC)wglGetProcAddress("glUniform2f");
+  glUniform2fv = (PFNGLUNIFORM2FVPROC)wglGetProcAddress("glUniform2fv");
 	glUniform3fv = (PFNGLUNIFORM3FVPROC)wglGetProcAddress("glUniform3fv");
 	glUniform4fv = (PFNGLUNIFORM4FVPROC)wglGetProcAddress("glUniform4fv");
 	glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)wglGetProcAddress("glUniformMatrix4fv");
