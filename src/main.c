@@ -11,13 +11,19 @@
 #include "windows.h"
 #include "gl/gl.h"
 
-#define WINDOW_WIDTH (800)
+#define WINDOW_WIDTH (1000)
 #define ASPECT_RATIO (16.0f/9.0f)
 
-#define NUM_AGENTS (300)
-#define MOVE_SPEED (0.2f)
-#define EVAPORATE_SPEED (0.5f)
-#define DIFFUSE_SPEED (3.4f)
+#define NUM_AGENTS (250)
+#define MOVE_SPEED (0.1f)
+#define TURN_SPEED (0.8f)
+
+#define EVAPORATE_SPEED (0.1f)
+#define DIFFUSE_SPEED (10.8f)
+
+#define SENSOR_ANGLE (0.4f)
+#define SENSOR_SIZE (2)
+#define SENSOR_OFFSET (0.4f)
 
 u32 CreateQuadVAO();
 u32 CreateQuadProgram();
@@ -57,14 +63,18 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "\n"
         "uniform float deltaTime;\n"
         "uniform float moveSpeed;\n"
+        "uniform float turnSpeed;\n"
         "uniform int agentCount;\n"
+        "uniform int sensorSize;\n"
+        "uniform float sensorAngle;\n"
+        "uniform float sensorOffsetDST;\n"
         "\n"
         "struct agent {\n"
         "   vec2 pos;\n"
         "   float dir;\n"
         "};\n"
         "\n"
-        "layout(std140, binding = 0) buffer agentsBuf {\n"
+        "layout(std140, binding = 0) buffer agentsBuffer {\n"
         "   agent agents[];\n"
         "};\n"
         "\n"
@@ -76,6 +86,23 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   state ^= state >> 16;\n"
         "   state *= 2654435769u;\n"
         "   return state;\n"
+        "}\n"
+        ""
+        "float sense(agent ag, float offset, ivec2 imageDim) {\n"
+        "   float angle = ag.dir + offset;\n"
+        "   vec2 dir = vec2(cos(angle), sin(angle));\n"
+        "   vec2 centerF = ag.pos + dir * sensorOffsetDST;\n"
+        "   ivec2 center = ivec2(centerF.x, centerF.y);\n"
+        "   float final = 0.0;\n"
+        "   for (int offX = -sensorSize; offX <= sensorSize; offX++) {\n"
+        "      for (int offY = -sensorSize; offY <= sensorSize; offY++) {\n"
+        "         ivec2 pos = center + ivec2(offX, offY);\n"
+        "         if (pos.x >= 0 && pos.x < imageDim.x && pos.y >= 0 && pos.y < imageDim.y) {\n"
+        "            final += imageLoad(trailMap, pos).x;\n"
+        "         }\n"
+        "      }\n"
+        "   }\n"
+        "   return final;\n"
         "}\n"
         "\n"
         "void main()\n"
@@ -89,6 +116,18 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         ""
         "   vec2 dir = vec2(cos(ag.dir), sin(ag.dir));\n"
         "   vec2 pos = ag.pos + dir * moveSpeed * deltaTime;\n"
+        ""
+        "   vec3 weights = vec3(sense(ag, 0, imageDim), sense(ag, sensorAngle, imageDim), sense(ag, -sensorAngle, imageDim));\n"
+        "   float randomSteerStrength = (random / 4294967295.0);\n"
+        ""
+        "   if (weights.x > weights.y && weights.x > weights.z) { agents[pixelCoord.x].dir += 0.0; }\n"
+        "   else if (weights.x < weights.y && weights.x < weights.z) {\n"
+        "      agents[pixelCoord.x].dir += (randomSteerStrength - 0.5) * 2 * turnSpeed * deltaTime;\n"
+        "   } else if (weights.z > weights.y) {\n"
+        "      agents[pixelCoord.x].dir -= randomSteerStrength * turnSpeed * deltaTime;\n"
+        "   } else if (weights.y > weights.z) {\n"
+        "      agents[pixelCoord.x].dir += randomSteerStrength * turnSpeed * deltaTime;\n"
+        "   }\n"
         ""
         "   if (pos.x < 0 || pos.x >= imageDim.x || pos.y < 0 || pos.y >= imageDim.y) {\n"
         "      pos.x = min(imageDim.x - 0.01, max(0, pos.x));\n"
@@ -110,6 +149,10 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   glUseProgram(computeProgram);
   glUniform1i(glGetUniformLocation(computeProgram, "agentCount"), NUM_AGENTS);
   glUniform1f(glGetUniformLocation(computeProgram, "moveSpeed"), MOVE_SPEED);
+  glUniform1f(glGetUniformLocation(computeProgram, "turnSpeed"), MOVE_SPEED);
+  glUniform1i(glGetUniformLocation(computeProgram, "sensorSize"), SENSOR_SIZE);
+  glUniform1f(glGetUniformLocation(computeProgram, "sensorAngle"), SENSOR_ANGLE);
+  glUniform1f(glGetUniformLocation(computeProgram, "sensorOffsetDST"), SENSOR_OFFSET);
   
   shader_info updateMapShaderInfo[] = {
     {GL_COMPUTE_SHADER, "#version 430\n"
@@ -154,7 +197,8 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   glUniform1f(glGetUniformLocation(processingShader, "evaporateSpeed"), EVAPORATE_SPEED);
   glUniform1f(glGetUniformLocation(processingShader, "diffuseSpeed"), DIFFUSE_SPEED);
   
-  u32 imageW = window->width, imageH = window->height;
+  u32 imageW = 320; // window->width;
+  u32 imageH = 180; // window->height;
   u32 texture = 0;
   { // create the texture
     glGenTextures(1, &texture);
@@ -164,8 +208,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (u32)window->width, (u32)window->height, 0, GL_RGBA, GL_FLOAT, 0);
-    glBindImageTexture(outLoc, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, imageW, imageH, 0, GL_RGBA, GL_FLOAT, 0);
   }
   
   { // query up the workgroups
@@ -183,6 +226,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   }
   
   u32 agentsBuffer = 0;
+  glUseProgram(computeProgram);
   glGenBuffers(1, &agentsBuffer);
   agent* agents = (agent*)ph_alloc(sizeof(agent) * NUM_AGENTS);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, agentsBuffer);
