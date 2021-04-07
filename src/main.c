@@ -14,15 +14,15 @@
 #define WINDOW_WIDTH (1000)
 #define ASPECT_RATIO (16.0f/9.0f)
 
-#define NUM_AGENTS (250)
-#define MOVE_SPEED (0.1f)
-#define TURN_SPEED (0.8f)
+#define NUM_AGENTS (20000)
+#define MOVE_SPEED (0.6f)
+#define TURN_SPEED (0.9f)
 
-#define EVAPORATE_SPEED (0.1f)
-#define DIFFUSE_SPEED (10.8f)
+#define EVAPORATE_SPEED (0.2f)
+#define DIFFUSE_SPEED (15.8f)
 
 #define SENSOR_ANGLE (0.4f)
-#define SENSOR_SIZE (2)
+#define SENSOR_SIZE (1)
 #define SENSOR_OFFSET (0.4f)
 
 u32 CreateQuadVAO();
@@ -54,6 +54,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   u32 quadVAO = CreateQuadVAO();
   u32 quadProgram = CreateQuadProgram();
   
+  // TODO: Uniforms don't work in functions?
   shader_info computeShaderInfo[] = {
     {GL_COMPUTE_SHADER, "#version 430\n"
         "layout (local_size_x = 1, local_size_y = 1) in;\n"
@@ -88,15 +89,14 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   return state;\n"
         "}\n"
         ""
-        "float sense(agent ag, float offset, ivec2 imageDim) {\n"
+        "float sense(in agent ag, in float offset, in ivec2 imageDim) {\n"
         "   float angle = ag.dir + offset;\n"
-        "   vec2 dir = vec2(cos(angle), sin(angle));\n"
-        "   vec2 centerF = ag.pos + dir * sensorOffsetDST;\n"
-        "   ivec2 center = ivec2(centerF.x, centerF.y);\n"
+        "   vec2 dir = vec2(cos(angle), sin(angle)) * vec2(0.4);\n"
+        "   ivec2 centre = ivec2(ag.pos + dir);\n"
         "   float final = 0.0;\n"
-        "   for (int offX = -sensorSize; offX <= sensorSize; offX++) {\n"
-        "      for (int offY = -sensorSize; offY <= sensorSize; offY++) {\n"
-        "         ivec2 pos = center + ivec2(offX, offY);\n"
+        "   for (int offX = -2; offX <= 2; offX++) {\n"
+        "      for (int offY = -2; offY <= 2; offY++) {\n"
+        "         ivec2 pos = centre + ivec2(offX, offY);\n"
         "         if (pos.x >= 0 && pos.x < imageDim.x && pos.y >= 0 && pos.y < imageDim.y) {\n"
         "            final += imageLoad(trailMap, pos).x;\n"
         "         }\n"
@@ -117,10 +117,22 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   vec2 dir = vec2(cos(ag.dir), sin(ag.dir));\n"
         "   vec2 pos = ag.pos + dir * moveSpeed * deltaTime;\n"
         ""
+        "   vec3 weights = vec3(sense(ag, 0, imageDim), sense(ag, sensorAngle, imageDim), sense(ag, -sensorAngle, imageDim));\n"
+        "   float randomSteerStrength = (float(random) / 4294967295.0);\n"
+        ""
+        "   if (weights.x > weights.y && weights.x > weights.z) { agents[pixelCoord.x].dir += 0.0; }\n"
+        "   else if (weights.x < weights.y && weights.x < weights.z) {\n"
+        "      agents[pixelCoord.x].dir += (randomSteerStrength - 0.5) * 2 * turnSpeed * deltaTime;\n"
+        "   } else if (weights.z > weights.y) {\n"
+        "      agents[pixelCoord.x].dir -= randomSteerStrength * turnSpeed * deltaTime;\n"
+        "   } else if (weights.y > weights.z) {\n"
+        "      agents[pixelCoord.x].dir += randomSteerStrength * turnSpeed * deltaTime;\n"
+        "   }\n"
+        ""
         "   if (pos.x < 0 || pos.x >= imageDim.x || pos.y < 0 || pos.y >= imageDim.y) {\n"
         "      pos.x = min(imageDim.x - 0.01, max(0, pos.x));\n"
         "      pos.y = min(imageDim.y - 0.01, max(0, pos.y));\n"
-        "      agents[pixelCoord.x].dir = (random / 4294967295.0) * 2 * PI;\n"
+        "      agents[pixelCoord.x].dir = (float(random) / 4294967295.0) * 2 * PI;\n"
         "   }\n"
         ""
         "   agents[pixelCoord.x].pos = pos;\n"
