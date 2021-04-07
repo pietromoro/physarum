@@ -35,7 +35,7 @@ typedef struct agent {
   u32 pad; // NOTE: padding ?!
 } agent;
 
-void ClearAgentsBuffer(window* window, agent* agents, u32 buffer);
+void ClearAgentsBuffer(u32 width, u32 height, agent* agents, u32 buffer);
 
 i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 showCode) {
   logger_initialize();
@@ -61,14 +61,6 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "\n"
         "#define PI 3.1415926535\n"
         "\n"
-        "uniform float deltaTime;\n"
-        "uniform float moveSpeed;\n"
-        "uniform float turnSpeed;\n"
-        "uniform int agentCount;\n"
-        "uniform int sensorSize;\n"
-        "uniform float sensorAngle;\n"
-        "uniform float sensorOffsetDST;\n"
-        "\n"
         "struct agent {\n"
         "   vec2 pos;\n"
         "   float dir;\n"
@@ -77,6 +69,14 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "layout(std140, binding = 0) buffer agentsBuffer {\n"
         "   agent agents[];\n"
         "};\n"
+        "\n"
+        "uniform float deltaTime;\n"
+        "uniform float moveSpeed;\n"
+        "uniform float turnSpeed;\n"
+        "uniform int agentCount;\n"
+        "uniform int sensorSize;\n"
+        "uniform float sensorAngle;\n"
+        "uniform float sensorOffsetDST;\n"
         "\n"
         "uint hash(uint state) {\n"
         "   state ^= 2747636419u;\n"
@@ -116,18 +116,6 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         ""
         "   vec2 dir = vec2(cos(ag.dir), sin(ag.dir));\n"
         "   vec2 pos = ag.pos + dir * moveSpeed * deltaTime;\n"
-        ""
-        "   vec3 weights = vec3(sense(ag, 0, imageDim), sense(ag, sensorAngle, imageDim), sense(ag, -sensorAngle, imageDim));\n"
-        "   float randomSteerStrength = (random / 4294967295.0);\n"
-        ""
-        "   if (weights.x > weights.y && weights.x > weights.z) { agents[pixelCoord.x].dir += 0.0; }\n"
-        "   else if (weights.x < weights.y && weights.x < weights.z) {\n"
-        "      agents[pixelCoord.x].dir += (randomSteerStrength - 0.5) * 2 * turnSpeed * deltaTime;\n"
-        "   } else if (weights.z > weights.y) {\n"
-        "      agents[pixelCoord.x].dir -= randomSteerStrength * turnSpeed * deltaTime;\n"
-        "   } else if (weights.y > weights.z) {\n"
-        "      agents[pixelCoord.x].dir += randomSteerStrength * turnSpeed * deltaTime;\n"
-        "   }\n"
         ""
         "   if (pos.x < 0 || pos.x >= imageDim.x || pos.y < 0 || pos.y >= imageDim.y) {\n"
         "      pos.x = min(imageDim.x - 0.01, max(0, pos.x));\n"
@@ -231,7 +219,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   agent* agents = (agent*)ph_alloc(sizeof(agent) * NUM_AGENTS);
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, agentsBuffer);
   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(agent) * NUM_AGENTS, 0, GL_DYNAMIC_DRAW);
-  ClearAgentsBuffer(window, agents, agentsBuffer);
+  ClearAgentsBuffer(imageW, imageH, agents, agentsBuffer);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, agentsLoc, agentsBuffer);
   
   
@@ -289,15 +277,15 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   return 0;
 }
 
-void ClearAgentsBuffer(window* window, agent* agents, u32 buffer) {
-  const f32 radius = MINIMUM(window->width, window->height);
+void ClearAgentsBuffer(u32 width, u32 height, agent* agents, u32 buffer) {
+  const f32 radius = MINIMUM(width, height);
   for (u32 i = 0; i < NUM_AGENTS; i++) {
     agent* current = &agents[i];
     const u32 rand = Hash((memory_index)(void*)current * i);
     current->dir = (f32)(rand % 360) * (3.14159265f / 180.0f);
     const f32 r = sqrtf((f32)rand / 4294967295.0) * radius;
-    current->x = (f32)window->width / 2.0f; // + cosf(current->dir) * r;
-    current->y = (f32)window->height / 2.0f; // + sinf(current->dir) * r;
+    current->x = (f32)width / 2.0f; // + cosf(current->dir) * r;
+    current->y = (f32)height / 2.0f; // + sinf(current->dir) * r;
     current->dir += 3.14159265f;
   }
   
