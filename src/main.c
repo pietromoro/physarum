@@ -14,16 +14,16 @@
 #define WINDOW_WIDTH (1000)
 #define ASPECT_RATIO (16.0f/9.0f)
 
-#define NUM_AGENTS (20000)
-#define MOVE_SPEED (0.6f)
-#define TURN_SPEED (0.9f)
+#define NUM_AGENTS (2000)
+#define MOVE_SPEED (20.6f)
+#define TURN_SPEED (5.9f)
 
-#define EVAPORATE_SPEED (0.2f)
-#define DIFFUSE_SPEED (15.8f)
+#define EVAPORATE_SPEED (0.8f)
+#define DIFFUSE_SPEED (18.8f)
 
-#define SENSOR_ANGLE (0.4f)
+#define SENSOR_ANGLE (0.8f)
 #define SENSOR_SIZE (1)
-#define SENSOR_OFFSET (0.4f)
+#define SENSOR_OFFSET (0.5f)
 
 u32 CreateQuadVAO();
 u32 CreateQuadProgram();
@@ -57,7 +57,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   // TODO: Uniforms don't work in functions?
   shader_info computeShaderInfo[] = {
     {GL_COMPUTE_SHADER, "#version 430\n"
-        "layout (local_size_x = 1, local_size_y = 1) in;\n"
+        "layout (local_size_x = 16, local_size_y = 1) in;\n"
         "layout (rgba32f) uniform image2D trailMap;\n"
         "\n"
         "#define PI 3.1415926535\n"
@@ -79,6 +79,14 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "uniform float sensorAngle;\n"
         "uniform float sensorOffsetDST;\n"
         "\n"
+        ""
+        "struct sense_settings {\n"
+        "   vec2 imageDim;\n"
+        "   float sensorOffset;\n"
+        "   int sensorSize;\n"
+        "   image2D map;\n"
+        "};\n"
+        "\n"
         "uint hash(uint state) {\n"
         "   state ^= 2747636419u;\n"
         "   state *= 2654435769u;\n"
@@ -89,15 +97,15 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   return state;\n"
         "}\n"
         ""
-        "float sense(in agent ag, in float offset, in ivec2 imageDim) {\n"
+        "float sense(in agent ag, in float offset, in sense_settings settings) {\n"
         "   float angle = ag.dir + offset;\n"
-        "   vec2 dir = vec2(cos(angle), sin(angle)) * vec2(0.4);\n"
+        "   vec2 dir = vec2(cos(angle), sin(angle)) * settings.sensorOffset;\n"
         "   ivec2 centre = ivec2(ag.pos + dir);\n"
         "   float final = 0.0;\n"
-        "   for (int offX = -2; offX <= 2; offX++) {\n"
-        "      for (int offY = -2; offY <= 2; offY++) {\n"
+        "   for (int offX = -settings.sensorSize; offX <= settings.sensorSize; offX++) {\n"
+        "      for (int offY = -settings.sensorSize; offY <= settings.sensorSize; offY++) {\n"
         "         ivec2 pos = centre + ivec2(offX, offY);\n"
-        "         if (pos.x >= 0 && pos.x < imageDim.x && pos.y >= 0 && pos.y < imageDim.y) {\n"
+        "         if (pos.x >= 0 && pos.x < settings.imageDim.x && pos.y >= 0 && pos.y < settings.imageDim.y) {\n"
         "            final += imageLoad(trailMap, pos).x;\n"
         "         }\n"
         "      }\n"
@@ -117,7 +125,8 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   vec2 dir = vec2(cos(ag.dir), sin(ag.dir));\n"
         "   vec2 pos = ag.pos + dir * moveSpeed * deltaTime;\n"
         ""
-        "   vec3 weights = vec3(sense(ag, 0, imageDim), sense(ag, sensorAngle, imageDim), sense(ag, -sensorAngle, imageDim));\n"
+        "   sense_settings sstt = sense_settings(imageDim, sensorOffsetDST, sensorSize, trailMap);\n"
+        "   vec3 weights = vec3(sense(ag, 0, sstt), sense(ag, sensorAngle, sstt), sense(ag, -sensorAngle, sstt));\n"
         "   float randomSteerStrength = (float(random) / 4294967295.0);\n"
         ""
         "   if (weights.x > weights.y && weights.x > weights.z) { agents[pixelCoord.x].dir += 0.0; }\n"
@@ -158,6 +167,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     {GL_COMPUTE_SHADER, "#version 430\n"
         "layout (local_size_x = 1, local_size_y = 1) in;\n"
         "layout (rgba32f) uniform image2D trailMap;\n"
+        "layout (rgba32f) uniform image2D diffusedTrailMap;\n"
         "\n"
         "uniform float deltaTime;\n"
         "uniform float diffuseSpeed;\n"
@@ -169,7 +179,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "   ivec2 imageDim = imageSize(trailMap);\n"
         "   if (pixelCoord.x < 0 || pixelCoord.x >= imageDim.x || pixelCoord.y < 0 || pixelCoord.y >= imageDim.y) { return; }\n"
         ""
-        "   vec4 original  = imageLoad(trailMap, pixelCoord);\n"
+        "   vec4 original = imageLoad(trailMap, pixelCoord);\n"
         ""
         "   vec4 finalSum = vec4(0.0);\n"
         "   for (int offX = -1; offX <= 1; offX++) {\n"
@@ -180,36 +190,70 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
         "         }\n"
         "      }\n"
         "   }\n"
+        ""
         "   vec4 blurred = finalSum / 9.0;"
         "   vec4 diffused = mix(original, blurred, diffuseSpeed * deltaTime);\n"
         "   vec4 newValue = max(vec4(0.0), diffused - evaporateSpeed * deltaTime);\n"
+        "   newValue = imageLoad(trailMap, pixelCoord);\n"
         ""
-        "   imageStore(trailMap, pixelCoord, newValue);\n"
+        "   imageStore(diffusedTrailMap, pixelCoord, newValue);\n"
         "}\0"
     },
     0
   };
   
   u32 processingShader = shader_create(updateMapShaderInfo);
-  u32 processingMapLoc = glGetUniformLocation(processingShader, "trailMap");
-  u32 processingDeltaTimeLoc = glGetUniformLocation(processingShader, "deltaTime");
   glUseProgram(processingShader);
+  u32 processingTrailMapLoc = glGetUniformLocation(processingShader, "trailMap");
+  u32 processingDiffusedMapLoc = glGetUniformLocation(processingShader, "diffusedTrailMap");
+  u32 processingDeltaTimeLoc = glGetUniformLocation(processingShader, "deltaTime");
   glUniform1f(glGetUniformLocation(processingShader, "evaporateSpeed"), EVAPORATE_SPEED);
   glUniform1f(glGetUniformLocation(processingShader, "diffuseSpeed"), DIFFUSE_SPEED);
   
-  u32 imageW = 320; // window->width;
-  u32 imageH = 180; // window->height;
-  u32 texture = 0;
-  { // create the texture
-    glGenTextures(1, &texture);
+  shader_info clearMapShaderInfo[] = {
+    {GL_COMPUTE_SHADER, "#version 430\n"
+        "layout (local_size_x = 1, local_size_y = 1) in;\n"
+        "layout (rgba32f) uniform image2D toClear;\n"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "   ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);\n"
+        "   ivec2 imageDim = imageSize(toClear);\n"
+        "   if (pixelCoord.x < 0 || pixelCoord.x >= imageDim.x || pixelCoord.y < 0 || pixelCoord.y >= imageDim.y) { return; }\n"
+        "   imageStore(toClear, pixelCoord, vec4(0.0));\n"
+        "}\0"
+    },
+    0
+  };
+  
+  u32 clearShader = shader_create(clearMapShaderInfo);
+  u32 clearMapLoc = glGetUniformLocation(clearShader, "toClear");
+  
+  u32 imageW = 320; //window->width;
+  u32 imageH = 180; //window->height;
+  u32 trailMap = 0, diffusedTrailMap = 0;
+  { // create the trail map texture
+    glGenTextures(1, &trailMap);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, trailMap);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, imageW, imageH, 0, GL_RGBA, GL_FLOAT, 0);
   }
+  
+  { // create the diffused trail map texture
+    glGenTextures(1, &diffusedTrailMap);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, diffusedTrailMap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, imageW, imageH, 0, GL_RGBA, GL_FLOAT, 0);
+  }
+  
   
   { // query up the workgroups
     int groupSize[3], groupInv;
@@ -234,6 +278,13 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
   ClearAgentsBuffer(imageW, imageH, agents, agentsBuffer);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, agentsLoc, agentsBuffer);
   
+  glUseProgram(clearShader);
+  glBindImageTexture(clearMapLoc, trailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+  glDispatchCompute(imageW, imageH, 1);
+  
+  glBindImageTexture(clearMapLoc, diffusedTrailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+  glDispatchCompute(imageW, imageH, 1);
+  
   
   glViewport(0, 0, window->width, window->height);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -249,22 +300,22 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     
     if (window->size_changed) {
       glViewport(0, 0, window->width, window->height);
-      //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, window->width, window->height, 0, GL_RGBA, GL_FLOAT, 0);
-      //ClearAgentsBuffer(window, agents, agentsBuffer);
+      // TODO: fix me!
       window->size_changed = 0;
     }
     
     glUseProgram(computeProgram);
-    glBindImageTexture(outLoc, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glBindImageTexture(outLoc, trailMap, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     glUniform1f(deltaTimeLoc, delta);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, agentsBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, agentsLoc, agentsBuffer);
-    glDispatchCompute(imageW, imageH, 1);
+    glDispatchCompute((i32)ceilf(NUM_AGENTS / 16.0f), 1, 1);
     
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
     
     glUseProgram(processingShader);
-    glBindImageTexture(processingMapLoc, texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(processingTrailMapLoc, trailMap, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(processingDiffusedMapLoc, diffusedTrailMap, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     glUniform1f(processingDeltaTimeLoc, delta);
     glDispatchCompute(imageW, imageH, 1);
     
@@ -274,7 +325,7 @@ i32 CALLBACK WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR cmdLine, i32 
     glUseProgram(quadProgram);
     glBindVertexArray(quadVAO);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, trailMap);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     
     opengl_swap_buffers(window);

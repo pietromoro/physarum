@@ -24,6 +24,7 @@ void opengl_swap_buffers(window* window);
 #define GL_ELEMENT_ARRAY_BUFFER           0x8893
 #define GL_CLAMP_TO_EDGE                  0x812F
 #define GL_RGBA32F                        0x8814
+#define GL_READ_ONLY                      0x88B8
 #define GL_WRITE_ONLY                     0x88B9
 #define GL_READ_WRITE                     0x88BA
 #define GL_SHADER_IMAGE_ACCESS_BARRIER_BIT 0x00000020
